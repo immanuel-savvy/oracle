@@ -10,7 +10,6 @@ The Oracle module in the God Protocol framework ensures seamless synchronization
 
 - **⚙️ Repository Synchronization**: Automatically syncs repositories across mirrors and servers.
 - **🪞 Mirror-Aware Architecture**: Maintains lightweight cache and propagation queues for mirrored nodes.
-- **🧩 Bulk Operations**: Optimized `write_bulk()` API for efficient multi-file commits.
 - **🌍 Horizontal Scalability**: Supports thousands of servers via Oracle Clients and async propagation queues.
 - **🔐 Authentication Layer**: Token-based client identification and authorization.
 - **🔁 Self-Propagating Network**: Oracles automatically sync peers and push updates to connected servers.
@@ -54,39 +53,40 @@ sync(server_details, repo_config).then((handler) => {
 
 ## ⚙️ API Reference
 
-### Class: `Oracle`
+### **Class: Oracle**
 
-#### `constructor(mirror)`
+| Method                                          | Description                                                                                |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `constructor(mirror)`                           | Initializes an Oracle instance with a mirror repository for coordination.                  |
+| `oracle.sync(server, mirror)`                   | Starts synchronization and returns a Node.js-compatible HTTP handler.                      |
+| `oracle.authenticate({ client })`               | Registers and authenticates a client node.                                                 |
+| `oracle.add_repo({ filter, repo }, { client })` | Adds a new repository with an optional filter (e.g., regex for content paths).             |
+| `oracle.write({ path, content }, client)`       | Writes content to one or more matching repositories and propagates updates across mirrors. |
+| `oracle.write_bulk(contents, client)`           | Writes multiple files efficiently in a single operation.                                   |
+| `oracle.read(path)`                             | Reads content from distributed repositories, returning both data and its source repo.      |
+| `oracle.propagate(payload, callback?)`          | Propagates data or sync signals across all registered servers.                             |
 
-Initializes an Oracle instance with a mirror repository for coordination.
+### **🧩 HTTP Endpoints**
 
-#### `oracle.sync(server, mirror)`
+These endpoints are exposed by the Oracle server’s route handler:
 
-Starts synchronization and returns a Node.js-compatible HTTP handler.
+| **Endpoint**                    | **Method** | **Description**                                                                                  |
+| ------------------------------- | ---------- | ------------------------------------------------------------------------------------------------ |
+| `/`                             | `GET`      | Returns a simple HTML response confirming the Oracle server is active.                           |
+| `/oracle/authenticate`          | `POST`     | Registers or authenticates a client. Returns an authorization token.                             |
+| `/oracle/read`                  | `POST`     | Reads data from one or more repositories. Requires `Authorization` header.                       |
+| `/oracle/write`                 | `POST`     | Writes data to repositories and synchronizes it across mirrors. Requires `Authorization` header. |
+| `/oracle/write_bulk`            | `POST`     | Writes multiple data entries in bulk. Requires `Authorization` header.                           |
+| `/oracle/add_repo`              | `POST`     | Adds a new repository with a given filter and metadata. Requires `Authorization` header.         |
+| `/oracle/on_sync`               | `POST`     | Called when a remote sync event occurs. Used internally for mirror updates.                      |
+| `/oracle/sync_repos`            | `POST`     | Synchronizes repository metadata across nodes.                                                   |
+| `/oracle/sync_content_location` | `POST`     | Synchronizes specific content location data across mirrors.                                      |
 
-#### `oracle.authenticate({ client })`
-
-Registers and authenticates a client node.
-
-#### `oracle.add_repo({ filter, repo }, { client })`
-
-Adds a new repository with an optional filter (e.g., regex for content paths).
-
-#### `oracle.write({ path, content }, client)`
-
-Writes content to one or more matching repositories and propagates updates across mirrors.
-
-#### `oracle.write_bulk(contents, client)`
-
-Efficiently writes multiple files in a single operation.
-
-#### `oracle.read(path)`
-
-Reads content from distributed repositories, returning both data and its source repository.
-
-#### `oracle.propagate(payload, callback?)`
-
-Propagates data or sync signals across all registered servers.
+> **Notes:**
+>
+> - All POST endpoints expect JSON body.
+> - Requests to `/oracle/*` (except `/authenticate`) require an `Authorization` header.
+> - The server responds with JSON and appropriate HTTP status codes (`200`, `401`, `404`, `500`).
 
 ---
 
