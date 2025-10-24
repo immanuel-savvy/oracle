@@ -1,0 +1,26 @@
+{
+  "name": "@godprotocol/oracle",
+  "version": "1.0.1",
+  "description": "Oracle Server for the God Protocol network.",
+  "main": "entry.js",
+  "type": "module",
+  "scripts": {
+    "start": "nodemon entry.js"
+  },
+  "keywords": [
+    "oracle",
+    "decentralized",
+    "godprotocol",
+    "server"
+  ],
+  "author": "Savvy",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/immanuel-savvy/oracle"
+  },
+  "dependencies": {
+    "@godprotocol/repositories": "^1.0.0",
+    "dotenv": "^17.2.3"
+  }
+}
