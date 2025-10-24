@@ -1,6 +1,6 @@
 {
   "name": "@godprotocol/oracle",
-  "version": "1.1.5",
+  "version": "1.1.6",
   "description": "Oracle Server for the God Protocol network.",
   "main": "index.js",
   "type": "module",
@@ -11,7 +11,8 @@
     "oracle",
     "decentralized",
     "godprotocol",
-    "server"
+    "server",
+    "web4.0"
   ],
   "author": "Savvy",
   "license": "MIT",
