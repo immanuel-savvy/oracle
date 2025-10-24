@@ -1,4 +1,4 @@
-# 🧠 @godprotocol/oracle
+# @godprotocol/oracle
 
 **A distributed coordination server for decentralized repositories.**
 
@@ -6,17 +6,17 @@ The Oracle module in the God Protocol framework ensures seamless synchronization
 
 ---
 
-## 🚀 Features
+## Features
 
-- **⚙️ Repository Synchronization**: Automatically syncs repositories across mirrors and servers.
-- **🪞 Mirror-Aware Architecture**: Maintains lightweight cache and propagation queues for mirrored nodes.
-- **🌍 Horizontal Scalability**: Supports thousands of servers via Oracle Clients and async propagation queues.
-- **🔐 Authentication Layer**: Token-based client identification and authorization.
-- **🔁 Self-Propagating Network**: Oracles automatically sync peers and push updates to connected servers.
+- **Repository Synchronization**: Automatically syncs repositories across mirrors and servers.
+- **Mirror-Aware Architecture**: Maintains lightweight cache and propagation queues for mirrored nodes.
+- **Horizontal Scalability**: Supports thousands of servers via Oracle Clients and async propagation queues.
+- **Authentication Layer**: Token-based client identification and authorization.
+- **Self-Propagating Network**: Oracles automatically sync peers and push updates to connected servers.
 
 ---
 
-## 📦 Installation
+## Installation
 
 Install the Oracle module using npm:
 
@@ -26,7 +26,7 @@ npm install @godprotocol/oracle
 
 ---
 
-## 🧩 Quick Start
+## Quick Start
 
 Set up an Oracle server with the following example:
 
@@ -51,7 +51,7 @@ sync(server_details, repo_config).then((handler) => {
 
 ---
 
-## ⚙️ API Reference
+## API Reference
 
 ### **Class: Oracle**
 
@@ -66,7 +66,7 @@ sync(server_details, repo_config).then((handler) => {
 | `oracle.read(path)`                             | Reads content from distributed repositories, returning both data and its source repo.      |
 | `oracle.propagate(payload, callback?)`          | Propagates data or sync signals across all registered servers.                             |
 
-### **🧩 HTTP Endpoints**
+### **HTTP Endpoints**
 
 These endpoints are exposed by the Oracle server’s route handler:
 
@@ -90,7 +90,7 @@ These endpoints are exposed by the Oracle server’s route handler:
 
 ---
 
-## 🖧 Network Design
+## Network Design
 
 The Oracle is built for non-blocking distributed propagation. When a write or repository sync occurs:
 
@@ -102,7 +102,7 @@ This design ensures fast request-response cycles and consistent eventual synchro
 
 ---
 
-## 📡 Example: Oracle Client
+## Example: Oracle Client
 
 Clients communicate with Oracle servers via a simple JSON-based POST interface:
 
@@ -132,7 +132,7 @@ console.log(data); // '{"id":1,"name":"John Doe"}'
 
 ---
 
-## 🔗 Related Packages
+## Related Packages
 
 | Package                     | Description                                      |
 | --------------------------- | ------------------------------------------------ |
@@ -142,6 +142,6 @@ console.log(data); // '{"id":1,"name":"John Doe"}'
 
 ---
 
-## 📜 License
+## License
 
-MIT © Savvy
+MIT © [Savvy](https://github.com/immanuel-savvy)
