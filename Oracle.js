@@ -225,7 +225,10 @@ class Oracle {
 
   mirrors_addr = `.mirrors/servers-0`;
 
-  sync = async () => {
+  sync = async (server, mirror) => {
+    this.server = server;
+    this.mirror = await this.mirror.cloth_repo(mirror);
+
     let handler = create_server({ oracle: this });
 
     let servers = await this.mirror.read(this.mirrors_addr);
@@ -243,7 +246,7 @@ class Oracle {
     // queue propagation to all other servers
     this.enqueue_propagation(() =>
       this.propagate(
-        { method: "sync", args: { server: this.server } },
+        { method: "on_sync", args: { server: this.server } },
         this.add_repos.bind(this)
       )
     );

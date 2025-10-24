@@ -62,7 +62,7 @@ const handle_routes = async (req, res, oracle, app) => {
         case "/oracle/add_repo":
           result = await oracle.add_repo(data, { client });
           break;
-        case "/oracle/sync":
+        case "/oracle/on_sync":
           result = await oracle.on_sync(data);
           break;
         case "/oracle/sync_repos":
