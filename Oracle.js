@@ -3,8 +3,7 @@ import { post_request } from "./utils/services.js";
 import create_server from "./server.js";
 
 class Oracle {
-  constructor(server, mirror) {
-    this.server = server;
+  constructor(mirror) {
     this.mirror = mirror;
 
     this.clients = {};
