@@ -1,42 +1,42 @@
-🧠 @godprotocol/oracle
+# 🧠 @godprotocol/oracle
 
-A distributed coordination server for decentralized repositories.
+**A distributed coordination server for decentralized repositories.**  
 The Oracle module in the God Protocol framework synchronizes data, repositories, and content across network nodes — ensuring consistency, resilience, and real-time scalability across thousands of distributed systems.
 
-🚀 Features
+---
 
-⚙️ Repository Synchronization: Automatically sync repositories across mirrors and servers.
+## 🚀 Features
 
-🪞 Mirror-Aware Architecture: Keeps lightweight cache and propagation queues for mirrored nodes only.
+- ⚙️ **Repository Synchronization:** Automatically sync repositories across mirrors and servers.
+- 🪞 **Mirror-Aware Architecture:** Keeps lightweight cache and propagation queues for mirrored nodes only.
+- 🧩 **Bulk Operations:** Optimized `write_bulk()` API for fast multi-file commits.
+- 🌍 **Horizontal Scalability:** Supports thousands of servers through Oracle Clients and async propagation queues.
+- 🔐 **Authentication Layer:** Token-based client identification and authorization.
+- 🔁 **Self-Propagating Network:** Oracles automatically sync peers and push updates to connected servers.
 
-🧩 Bulk Operations: Optimized write_bulk() API for fast multi-file commits.
+---
 
-🌍 Horizontal Scalability: Supports thousands of servers through Oracle Clients and async propagation queues.
+## 📦 Installation
 
-🔐 Authentication Layer: Token-based client identification and authorization.
-
-🔁 Self-Propagating Network: Oracles automatically sync peers and push updates to connected servers.
-
+```bash
 📦 Installation
 npm install @godprotocol/oracle
 
 🧩 Quick Start
-import Repos from "@godprotocol/repositories";
-import Oracle from "@godprotocol/oracle";
+import sync from "@godprotocol/oracle/index.js";
+import {repo_config} from "./repos.js"
 
-const mirror = new Repos();
-const oracle = new Oracle(mirror);
+let server_details =  {
+    hostname: process.env.HOSTNAME,
+    port: process.env.PORT
+  }
 
-const server = {
-hostname: "localhost",
-port: 5050,
-};
-
-// Sync the Oracle server
-oracle.sync(server, mirror).then((handler) => {
+sync(server_details, repo,
+).then((handler) => {
 const http = require("http");
-http.createServer(handler).listen(server.port, () => {
-console.log(`Oracle server running at http://${server.hostname}:${server.port}`);
+
+http.createServer(handler).listen(server_details.port, () => {
+console.log(`Oracle server running at http://${server_details.hostname}:${server_details.port}`);
 });
 });
 
@@ -120,3 +120,4 @@ Data storage and remote access integration layer
 📜 License
 
 MIT © Savvy
+```
