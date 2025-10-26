@@ -41,8 +41,8 @@ const handle_routes = async (req, res, oracle, app) => {
       result = await oracle.authenticate(data);
     } else {
       // Always check auth header carefully
-      const auth = req.headers.authorization || req.headers.authorisation;
-      const client = await oracle.get_client(auth);
+      let auth = req.headers.authorization || req.headers.authorisation;
+      let client = await oracle.get_client(auth);
 
       if (!client) {
         res.writeHead(401, { "Content-Type": "application/json" });
@@ -54,13 +54,13 @@ const handle_routes = async (req, res, oracle, app) => {
           result = await oracle.read(data.path, client);
           break;
         case "/oracle/write":
-          result = await oracle.write(data, client);
+          result = oracle.write(data, client);
           break;
         case "/oracle/write_bulk":
-          result = await oracle.write_bulk(data.content, client);
+          result = oracle.write_bulk(data.content, client);
           break;
         case "/oracle/add_repo":
-          result = await oracle.add_repo(data, { client });
+          result = oracle.add_repo(data, { client });
           break;
         case "/oracle/on_sync":
           result = await oracle.on_sync(data);

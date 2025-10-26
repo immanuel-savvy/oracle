@@ -166,8 +166,11 @@ class Oracle {
   };
 
   set_to_repos = async (path, content, options = {}) => {
+    let { repos: repos_ } = options;
     let repos = [];
     for (let _id in this.repos) {
+      if (repos_ && !repos_.includes(_id)) continue;
+
       let { filter, repo } = this.repos[_id];
       if (filter && !path.match(filter)) continue;
 
