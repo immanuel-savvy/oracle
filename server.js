@@ -51,7 +51,7 @@ const handle_routes = async (req, res, oracle, app) => {
 
       switch (req.url) {
         case "/oracle/read":
-          result = await oracle.read(data.path, client);
+          result = await oracle.read(data.path, data.options, client);
           break;
         case "/oracle/write":
           result = oracle.write(data, client);
@@ -60,16 +60,10 @@ const handle_routes = async (req, res, oracle, app) => {
           result = oracle.write_bulk(data.content, client);
           break;
         case "/oracle/add_repo":
-          result = oracle.add_repo(data, { client });
+          result = oracle.add_repo(data, client);
           break;
-        case "/oracle/on_sync":
-          result = await oracle.on_sync(data);
-          break;
-        case "/oracle/sync_repos":
-          result = await oracle.sync_repos(data);
-          break;
-        case "/oracle/sync_content_location":
-          result = await oracle.sync_content_location(data);
+        case "/oracle/sync_content_repos":
+          result = await oracle.sync_content_repos(data);
           break;
         default:
           res.writeHead(404, { "Content-Type": "application/json" });

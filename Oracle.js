@@ -1,259 +1,326 @@
 import Repos from "@godprotocol/repositories";
 import { post_request } from "./utils/services.js";
 import create_server from "./server.js";
+import {
+  decrypt,
+  hash,
+  encrypt,
+} from "@godprotocol/repositories/utils/cryptography.js";
 
 class Oracle {
-  constructor(mirror) {
-    this.mirror = mirror;
+  constructor() {
+    this.server = null;
+    this.mirror = null;
+    this.servers = new Array();
 
-    this.clients = {};
-    this.clients_id = {};
-    this.client_repos = {};
-    this.content_locations = {};
-    this.repos = {};
-    this.god_repos = new Repos();
-
-    this.servers = [];
-
-    this.propagation_queue = Promise.resolve();
+    this.clients = new Object();
+    this.content_repos = new Array();
+    this.client_repos = new Array();
   }
 
-  get_client = (client) => {
-    let id = this.clients_id[client];
-    return this.clients[id];
+  get_from_repo = async (path, options = {}) => {
+    let { repos, repo_options = {} } = options,
+      content;
+
+    for (let r = 0; r < repos.length; r++) {
+      let { repo } = repos[r];
+
+      if (repo_options && repo_options.decrypt) {
+        if (typeof repo_options.decrypt === "boolean")
+          repo_options.decrypt = this.manager_key;
+      }
+      content = await repo.read(path, repo_options);
+      if (content) {
+        return { content, repo };
+      }
+    }
+    return {};
+  };
+
+  set_to_repos = async (path, content, options = {}) => {
+    let { repos, repo_options } = options,
+      passes = [];
+
+    for (let r = 0; r < repos.length; r++) {
+      let { filter, repo } = repos[r];
+      if (filter && !path.match(filter)) continue;
+
+      if (repo_options && repo_options.encrypt) {
+        if (typeof repo_options.encrypt === "boolean")
+          repo_options.encrypt = this.manager_key;
+      }
+
+      await repo.write(path, content, repo_options);
+      passes.push(repo);
+    }
+    return passes;
+  };
+
+  add_repo = async (payload, client) => {
+    let res = decrypt(payload.repo, this.manager_key);
+    res = res && JSON.parse(res);
+    let { filter, repo } = res;
+
+    repo = await this.cloth_repo(repo);
+
+    let repo_id = repo.repo_id();
+    let reps = this.client_repos[client.id];
+    if (!reps) {
+      reps = [];
+      this.client_repos[client.id] = reps;
+    }
+    if (!reps.find((r) => r.repo.repo_id() === repo_id)) {
+      reps.push({ filter, repo });
+    } else return;
+
+    let list = [];
+    for (let l = 0; l < reps.length; l++) {
+      let { repo, filter } = reps[l];
+      let repo_obj = await repo.objectify();
+      list.push({ filter, repo: repo_obj });
+    }
+
+    await this.mirror.write(
+      `.mirrors/clients/repos/${hash(client.id)}`,
+      JSON.stringify(list),
+      { encrypt: this.manager_key }
+    );
+  };
+
+  get_content_repos = async (path) => {
+    let repos = this.content_repos[path];
+
+    if (repos) return repos;
+
+    repos = await this.mirror.read(`.oracle/${path}`, {
+      decrypt: this.manager_key,
+    });
+    if (repos) {
+      repos = JSON.parse(repos);
+    } else return [];
+
+    await this.cloth_repo_list(repos);
+
+    return (this.content_repos[path] = repos);
+  };
+
+  cloth_repo_list = async (list) => {
+    for (let r = 0; r < list.length; r++) {
+      let { repo, filter } = list[r];
+      list[r] = { filter, repo: await this.cloth_repo(repo) };
+    }
+  };
+
+  merge_repos = async (r1, r2) => {
+    let lst = r1.concat(r2);
+    let ids = lst.map((r) => r.repo.repo_id());
+
+    ids = Array.from(new Set(ids));
+    let repos = [];
+    for (let i = 0; i < ids.length; i++) {
+      let id = ids[i];
+      repos.push(lst.find((r) => r.repo.repo_id() === id));
+    }
+    return repos;
+  };
+
+  set_content_repos = async (path, repos, new_bies) => {
+    this.content_repos[path] = [...repos];
+    let content_reps = [];
+    for (let c = 0; c < repos.length; c++) {
+      let repo = repos[c];
+      content_reps[c] = {
+        filter: repo.filter,
+        repo: await repo.repo.objectify(),
+      };
+    }
+
+    await this.mirror.write(`.oracle/${path}`, JSON.stringify(content_reps), {
+      encrypt: this.manager_key,
+    });
+    this.propagate({
+      method: "sync_content_repos",
+      args: { path, repos: new_bies },
+    });
   };
 
   fetch = async (payload, server) => {
+    let response;
     try {
-      let resp = await post_request({
+      response = post_request({
         options: {
           ...server,
           path: `/oracle/${payload.method}`,
         },
         data: JSON.stringify(payload.args),
       });
-      return resp || null;
     } catch (e) {
-      console.warn("fetch error:", e.message || e);
-      return null;
+      console.log(e);
     }
+    return response;
   };
 
-  propagate = async (payload, cb) => {
-    if (!Array.isArray(this.servers)) return;
-
-    for (let m = 0; m < this.servers.length; m++) {
-      let server = this.servers[m];
+  propagate = async (payload) => {
+    for (let s = 0; s < this.servers.length; s++) {
+      let server = this.servers[s];
       if (this.server_match(server, this.server)) continue;
 
-      try {
-        let res = await this.fetch(payload, server);
-        cb && (await cb(res));
-      } catch (e) {
-        console.warn("propagation error:", e.message || e);
+      this.fetch(payload, server);
+    }
+  };
+
+  write = async ({ path, content, options }, client) => {
+    let content_path = await this.get_content_repos(path);
+    let client_repos = await this.load_client_repos(client);
+
+    let repos = await this.merge_repos(content_path, client_repos);
+
+    let passes = await this.set_to_repos(path, content, {
+        repos,
+        repo_options: options,
+      }),
+      store = new Array();
+    for (let p = 0; p < passes.length; p++) {
+      let pass = passes[p];
+      if (!content_path.find((c) => c.repo.repo_id() === pass.repo_id())) {
+        content_path.push({ repo: pass });
+        store.push(await pass.objectify());
       }
     }
+
+    store.length && (await this.set_content_repos(path, content_path, store));
   };
 
-  enqueue_propagation(fn) {
-    // ensure fn always returns a Promise
-    this.propagation_queue = this.propagation_queue.then(() =>
-      Promise.resolve()
-        .then(fn)
-        .catch((e) => {
-          console.warn("Queued propagation failed:", e.message || e);
-        })
-    );
-    return this.propagation_queue;
-  }
+  sync_content_repos = async ({ path, repos }) => {
+    let content_path = await this.get_content_repos(path, true);
+    if (!content_path) return;
 
-  sync_repos = async ({ filter, repo, repo_id }) => {
-    let rep = this.repos[repo_id];
-    repo = await this.god_repos.cloth_repo(repo);
-    if (!repo) return;
-
-    if (rep) rep.filter = filter;
-    else this.repos[repo_id] = { filter, repo };
-  };
-
-  add_repo = async ({ filter, repo }, { client, no_propagate } = {}) => {
-    repo = await this.god_repos.cloth_repo(repo);
-    if (!repo) return;
-
-    let repo_id = repo.repo_id();
-    let propg = {
-      method: "sync_repos",
-      args: { filter, repo: await repo.objectify(), repo_id },
-    };
-
-    this.repos[repo_id] = { filter, repo };
-
-    if (!no_propagate) {
-      this.enqueue_propagation(() => this.propagate(propg));
-    }
-
-    let reps = this.client_repos[client?.client_id];
-    if (!reps) {
-      this.client_repos[client?.client_id] = [repo_id];
-    } else if (!reps.includes(repo_id)) {
-      reps.push(repo_id);
-    }
-  };
-
-  authenticate = async ({ client }) => {
-    let id = `${client.hostname}:${client.port}`;
-    let client_id = `${Math.random().toString().slice(2)}:${Date.now()}`;
-
-    this.clients[id] = { client, client_id, id };
-    this.clients_id[client_id] = id;
-
-    return { token: client_id };
-  };
-
-  get_content_location = async (path) => {
-    let repos = this.content_locations[path];
-    let addr = `.oracle/${path}`;
-
-    if (!repos) {
-      let read = await this.mirror.read_file(addr);
-      if (read.ok) {
-        repos = JSON.parse(read.content);
-        this.content_locations[path] = repos;
+    for (let p = 0; p < repos.length; p++) {
+      let repo = repos[p];
+      if (!content_path.find((c) => c.repo.repo_id() === repo._id)) {
+        content_path.push({ repo: await this.cloth_repo(repo) });
       }
-    }
-    return repos;
-  };
-
-  write = async ({ path, content }, client) => {
-    let reps = this.client_repos[client.client_id] || [];
-    let repos = (await this.get_content_location(path)) || [];
-
-    let response = await this.set_to_repos(path, content, {
-      repos: Array.from(new Set([...repos, ...reps])),
-    });
-
-    let new_repos = response.filter((r) => !repos.includes(r));
-    if (new_repos.length) {
-      let locs = this.content_locations[path] || [];
-      this.content_locations[path] = [...locs, ...new_repos];
-      await this.mirror.write_file(
-        `.oracle/${path}`,
-        JSON.stringify(this.content_locations[path])
-      );
-
-      // queue propagation
-      this.enqueue_propagation(() =>
-        this.propagate({
-          method: "sync_content_location",
-          args: { path, repos: new_repos },
-        })
-      );
     }
   };
 
   write_bulk = async (contents, client) => {
     for (let c = 0; c < contents.length; c++) {
-      let { path, content } = contents[c];
-      await this.write({ path, content }, client);
+      let { path, content, options } = contents[c];
+      await this.write({ path, content, options }, client);
     }
   };
 
-  read = async (path) => {
-    let result = await this.get_from_repos(path, {
-      repos: await this.get_content_location(path),
+  read = async (path, options, client) => {
+    let repos = await this.get_content_repos(path);
+
+    let response = await this.get_from_repo(path, {
+      repos,
+      repo_options: options,
     });
-    return result;
+    if (!response.content) {
+      return;
+    }
+    response.repo = encrypt(
+      JSON.stringify(await response.repo.objectify()),
+      this.manager_key
+    );
+    return response;
   };
 
-  set_to_repos = async (path, content, options = {}) => {
-    let { repos: repos_ } = options;
-    let repos = [];
-    for (let _id in this.repos) {
-      if (repos_ && !repos_.includes(_id)) continue;
+  load_client_repos = async ({ id }) => {
+    if (this.client_repos[id]) {
+      return this.client_repos[id];
+    }
 
-      let { filter, repo } = this.repos[_id];
-      if (filter && !path.match(filter)) continue;
+    let reps = await this.mirror.read(`.mirrors/clients/repos/${hash(id)}`, {
+      decrypt: this.manager_key,
+    });
+    if (!reps) return;
+    reps = JSON.parse(reps);
 
-      try {
-        await repo.write_file(path, content);
-        repos.push(_id);
-      } catch (e) {
-        console.warn(`Failed writing to repo ${_id}:`, e.message || e);
+    await this.cloth_repo_list(reps);
+
+    this.client_repos[id] = reps;
+    return reps;
+  };
+
+  authenticate = async ({ client, key }) => {
+    let token = `${Math.random().toString().slice(2)}:${Date.now()}`;
+
+    try {
+      if (this.manager_key !== decrypt(key, this.manager_key))
+        throw new Error("Invalid Key");
+    } catch (e) {
+      return {};
+    }
+
+    let obj = {
+      client,
+      timestamp: Date.now(),
+      token,
+      id: `${client.hostname}:${client.port || ""}`,
+    };
+    this.clients[token] = obj;
+    await this.mirror.write(
+      `.mirrors/clients/${hash(token)}`,
+      JSON.stringify(obj)
+    );
+    this.load_client_repos(obj);
+
+    return { token };
+  };
+
+  get_client = async (token) => {
+    let client = this.clients[token],
+      addr = `.mirrors/clients/${hash(token)}`;
+    if (!client) {
+      client = await this.mirror.read(addr);
+      if (client) {
+        client = JSON.parse(client);
+        if (client.expired) client = null;
       }
     }
-    return repos;
-  };
 
-  get_from_repos = async (path, options = {}) => {
-    let { repos } = options;
-    for (let _id in this.repos) {
-      if (repos && !repos.includes(_id)) continue;
-
-      let { filter, repo } = this.repos[_id];
-      if (filter && !path.match(filter)) continue;
-
-      let content = await repo.read(path);
-      if (content) {
-        let repo_ = await repo.objectify();
-        return { content, repo: repo_ };
-      }
+    if (!client) return;
+    if (Date.now() - client.timestamp > 24 * 60 * 60 * 1000) {
+      client.expired = true;
+      await this.mirror.write(addr, JSON.stringify(client));
+      return "Client token expired. Duration lasts for 24 hours only";
     }
-    return { content: null, repo: null };
+
+    return client;
   };
 
-  server_match = (s1, s2) => s1.hostname === s2.hostname && s1.port === s2.port;
+  cloth_repo = new Repos().cloth_repo;
 
-  add_repos = async (repos) => {
-    for (let r = 0; r < repos.length; r++) {
-      let { filter, repo, repo_id } = repos[r];
-      if (this.repos[repo_id]) continue;
-
-      repo = await this.god_repos.cloth_repo(repo);
-      if (repo) await this.add_repo({ filter, repo }, { no_propagate: true });
-    }
+  server_match = (s1, s2) => {
+    return s1.hostname === s2.hostname && s1.port === s2.port;
   };
 
-  on_sync = async ({ server }) => {
-    if (!this.servers.find((s) => this.server_match(s, server))) {
-      this.servers.push(server);
-    }
-    return [];
-  };
+  servers_addr = `.mirrors/.servers`;
 
-  sync_content_location = async ({ path, repos }) => {
-    let locs = this.content_locations[path] || [];
-    this.content_locations[path] = Array.from(new Set([...locs, ...repos]));
-  };
-
-  mirrors_addr = `.mirrors/servers-0`;
-
-  sync = async (server, mirror) => {
-    this.server = server;
-    this.mirror = await this.mirror.cloth_repo(mirror);
-
-    let handler = create_server({ oracle: this });
-
-    let servers = await this.mirror.read(this.mirrors_addr);
-    if (servers) {
-      servers = JSON.parse(servers);
-    } else servers = [];
+  sync_servers = async () => {
+    let servers = await this.mirror.read(this.servers_addr);
+    if (!servers) {
+      servers = new Array();
+    } else servers = JSON.parse(servers);
 
     if (!servers.find((s) => this.server_match(s, this.server))) {
       servers.push(this.server);
-      await this.mirror.write(this.mirrors_addr, JSON.stringify(servers));
+      await this.mirror.write(this.servers_addr, JSON.stringify(servers));
     }
-
     this.servers = servers;
+  };
 
-    // queue propagation to all other servers
-    this.enqueue_propagation(() =>
-      this.propagate(
-        { method: "on_sync", args: { server: this.server } },
-        this.add_repos.bind(this)
-      )
-    );
+  sync = async (server, mirror, options = {}) => {
+    let { manager_key } = options;
+    this.manager_key = manager_key;
+    this.server = server;
+    this.mirror = await this.cloth_repo(mirror);
 
-    return handler;
+    await this.sync_servers();
+
+    return create_server({ oracle: this, app: null });
   };
 }
 

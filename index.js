@@ -1,9 +1,6 @@
-import Repos from "@godprotocol/repositories";
 import Oracle from "./Oracle.js";
 
-let mirror = new Repos();
-
-let oracle = new Oracle(mirror);
+let oracle = new Oracle();
 
 export default oracle.sync;
 export { oracle };

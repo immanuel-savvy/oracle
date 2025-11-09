@@ -1,6 +1,6 @@
 {
   "name": "@godprotocol/oracle",
-  "version": "1.1.9",
+  "version": "1.1.25",
   "description": "Oracle Server for the God Protocol network.",
   "main": "index.js",
   "type": "module",
@@ -12,7 +12,7 @@
     "decentralized",
     "godprotocol",
     "server",
-    "web4.0"
+    "web4"
   ],
   "author": "Savvy",
   "license": "MIT",
@@ -21,6 +21,6 @@
     "url": "https://github.com/immanuel-savvy/oracle"
   },
   "dependencies": {
-    "@godprotocol/repositories": "latest"
+    "@godprotocol/repositories": "^1.1.26"
   }
 }
